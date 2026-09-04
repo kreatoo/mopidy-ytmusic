@@ -5,6 +5,10 @@ v0.4.0
 ========================================
 
 Revival release: makes the extension work with the current ecosystem.
+- Sanitize auth headers written by `mopidy ytmusic setup`: strip
+  `content-encoding`/`host`/`content-length` which otherwise make YouTube
+  reject requests with HTTP 400
+
 
 - Support Mopidy 3.4+ and Mopidy 4.x (Python >= 3.10)
 - Update to ytmusicapi 1.x (was pinned to 0.22 - 0.29)

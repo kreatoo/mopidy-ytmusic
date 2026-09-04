@@ -10,10 +10,41 @@ SETUP_INSTRUCTIONS = (
 )
 
 
-def _setup_auth(filepath):
-    """Prompt the user for browser headers and store them in auth.json."""
+def _sanitize_auth_json(path):
+    """Strip headers that break outgoing API requests.
+
+    ``content-encoding: gzip`` (present in some Chrome "copy request headers"
+    blocks) makes YouTube expect a compressed request body and reject our
+    request with HTTP 400. ``host``/``content-length`` are request-specific
+    and must not be reused either.
+    """
+    import json
+
+    try:
+        with open(path) as file:
+            data = json.load(file)
+        changed = False
+        for bad in ("content-encoding", "content-length", "host"):
+            if bad in data:
+                data.pop(bad)
+                changed = True
+        if changed:
+            with open(path, "w") as file:
+                json.dump(data, file, indent=2)
+    except (OSError, ValueError):
+        logger.exception("YTMusic failed sanitizing auth headers")
+
+
+def _write_auth_json(path, headers_raw=None):
+    """Run ytmusicapi.setup() and sanitize the resulting auth.json."""
     from ytmusicapi import setup
 
+    setup(filepath=str(path), headers_raw=headers_raw)
+    _sanitize_auth_json(path)
+
+
+def _setup_auth(filepath):
+    """Prompt the user for browser headers and store them in auth.json."""
     path = Path(filepath)
     print('Using "' + str(path) + '"')
     if path.exists():
@@ -21,7 +52,7 @@ def _setup_auth(filepath):
         return 1
     print(SETUP_INSTRUCTIONS)
     try:
-        setup(filepath=str(path))
+        _write_auth_json(path)
     except Exception:
         logger.exception("YTMusic setup failed")
         return 1
@@ -36,13 +67,11 @@ def _setup_auth(filepath):
 
 def _reauth(filepath):
     """Prompt the user for new browser headers and overwrite auth.json."""
-    from ytmusicapi import setup
-
     path = Path(filepath)
     print('Updating credentials in  "' + str(path) + '"')
     print(SETUP_INSTRUCTIONS)
     try:
-        setup(filepath=str(path))
+        _write_auth_json(path)
     except Exception:
         logger.exception("YTMusic setup failed")
         return 1
