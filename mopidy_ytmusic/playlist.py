@@ -105,7 +105,18 @@ class YTMusicPlaylistsProvider(backend.PlaylistsProvider):
         if len(remove):
             logger.debug('YTMusic removing items "%s" from playlist', remove)
             try:
-                videos = [t for t in pls["tracks"] if t["videoId"] in remove]
+                # remove_playlist_items needs the per-item setVideoId, which is
+                # only present on playlists owned by the user.
+                videos = [
+                    t
+                    for t in pls["tracks"]
+                    if t["videoId"] in remove and t.get("setVideoId")
+                ]
+                if len(videos) != len(remove):
+                    logger.error(
+                        "YTMusic skipping removal of %d item(s) without setVideoId",
+                        len(remove) - len(videos),
+                    )
                 self.backend.api.remove_playlist_items(bId, videos)
             except Exception:
                 logger.exception("YTMusic failed removing items from playlist")

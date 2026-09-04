@@ -14,15 +14,33 @@ Mopidy-YTMusic
     :target: https://github.com/OzymandiasTheGreat/mopidy-ytmusic/commits/master
     :alt: Commits Since Latest Release
 
-Mopidy extension for playing music from YouTube Music
+Mopidy extension for playing music from YouTube Music.
+
+This is a revival of the archived project: the extension is updated to work
+with Mopidy 3.4+ and Mopidy 4.x, ytmusicapi 1.x, Python 3.10+ and the current
+YouTube Music web API (2026). Playable stream URLs are now resolved with
+`yt-dlp <https://github.com/yt-dlp/yt-dlp>`_, which replaces the old pytube
+based signature decoding.
+
+
+Requirements
+============
+
+- Python >= 3.10
+- Mopidy >= 3.4 (both the 3.x and 4.x series are supported)
+- An internet connection to YouTube Music
 
 
 Installation
 ============
 
-Install by running::
+Install with pip::
 
-    sudo python3 -m pip install Mopidy-YTMusic
+    python3 -m pip install Mopidy-YTMusic
+
+or with pipx, if you want to keep it out of your system Python::
+
+    pipx install Mopidy-YTMusic
 
 See https://mopidy.com/ext/ytmusic/ for alternative installation methods.
 
@@ -59,7 +77,7 @@ Then restart mopidy for the new credentials to go into effect.
 Other configuration options are as follows:
 
 - :code:`auto_playlist_refresh` - time (in minutes) to refresh the Auto playlists.  Default: 60. Set to 0 to disable auto playlists.
-- :code:`youtube_player_refresh` - time (in minutes) to refresh the Youtube player url (used for decoding the signature).  Default: 15
+- :code:`youtube_player_refresh` - **legacy**: accepted for old configs but no longer used. Stream URLs are resolved with yt-dlp, which manages its own player JS.
 - :code:`playlist_item_limit` - Number of items to grab from playlists.  This is not exact.  Default: 100
 - :code:`subscribed_artist_limit` - Number of subscriptions to list. Default: 100. Set to 0 to disable subscription list.
 - :code:`enable_history` - Show Recently Played playlist. Default: yes

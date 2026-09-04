@@ -1,7 +1,24 @@
-*********
 Changelog
 *********
 
+v0.4.0
+========================================
+
+Revival release: makes the extension work with the current ecosystem.
+
+- Support Mopidy 3.4+ and Mopidy 4.x (Python >= 3.10)
+- Update to ytmusicapi 1.x (was pinned to 0.22 - 0.29)
+- Replace pytube with yt-dlp for resolving playable stream URLs
+  (handles the current signature, ``n`` and ``pot`` stream parameters)
+- Replace deprecated ``pkg_resources`` with ``importlib.metadata``
+- Rewrite the CLI commands for Mopidy 4 (Cyclopts) while keeping
+  the Mopidy 3 command tree
+- Fix album/upload parsing for the current YouTube Music data shapes
+- Drop the unused youtube_player_refresh machinery (config key kept
+  for backwards compatibility)
+- Drop the stale requirements.txt in favour of pyproject.toml
+
+*********
 v0.3.8
 ========================================
 

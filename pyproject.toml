@@ -13,22 +13,20 @@ sections = "FUTURE,STDLIB,THIRDPARTY,FIRSTPARTY,TESTS,LOCALFOLDER"
 
 [tool.poetry]
 name = "Mopidy-YTMusic"
-version = "0.3.8"
-description = "Mopidy extension for playling music/managing playlists in Youtube Music"
+version = "0.4.0"
+description = "Mopidy extension for playing music/managing playlists in YouTube Music"
 authors = ["Ozymandias (Tomas Ravinskas) <tomas.rav@gmail.com>"]
 license = "Apache-2.0"
 
 [tool.poetry.dependencies]
-python = "^3.7"
-Mopidy = "^3"
-pytube = "^12.1.0"
-ytmusicapi = ">=0.22.0, <0.30.0"
+python = ">=3.10,<4.0"
+Mopidy = ">=3.4,<5"
+ytmusicapi = ">=1.9,<2"
+yt-dlp = ">=2024.1.1"
 
-[tool.poetry.dev-dependencies]
-flake8 = "^3.8.4"
-setuptools = "^51.0.0"
-Sphinx = "^3.3.1"
-poetry2setup = "^1.0.0"
+[tool.poetry.group.dev.dependencies]
+pytest = ">=7.0"
+flake8 = "^5.0"
 isort = "^5"
 black = { version = "*", allow-prereleases = true }
 
@@ -38,7 +36,3 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.poetry.plugins."mopidy.ext"]
 ytmusic = "mopidy_ytmusic:Extension"
-
-[tool.dephell.main]
-from = {format = "poetry", path = "pyproject.toml"}
-to = {format = "setuppy", path = "setup.py"}
