@@ -95,6 +95,8 @@ class Extension(ext.Extension):
     def get_config_schema(self):
         schema = super().get_config_schema()
         schema["auth_json"] = config.Path(optional=True)
+        schema["oauth_client_id"] = config.String(optional=True)
+        schema["oauth_client_secret"] = config.String(optional=True)
         schema["auto_playlist_refresh"] = config.Integer(
             minimum=0, optional=True
         )

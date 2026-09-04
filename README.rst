@@ -74,6 +74,29 @@ Run :code:`mopidy ytmusic reauth` (or :code:`sudo mopidyctl ytmusic reauth`) to
 paste in new headers and overwrite your existing auth.json file.
 Then restart mopidy for the new credentials to go into effect.
 
+A more durable alternative is OAuth: the access token is refreshed
+automatically and never needs to be re-pasted, only the one-time
+authorization does.
+
+1. Create an OAuth client in the `Google Cloud Console
+   <https://console.cloud.google.com/apis/credentials>`_ (a small project
+   with the `YouTube Data API v3` enabled; client type does not matter much
+   as ytmusicapi uses the device flow) and note its **client ID** and
+   **client secret**.
+2. Run :code:`mopidy ytmusic oauth`, enter the client ID and secret, and
+   authorize in the browser that opens.
+3. Add to your Mopidy configuration:
+
+   .. code::
+
+       [ytmusic]
+       auth_json = /path/to/oauth.json
+       oauth_client_id = <client_id>
+       oauth_client_secret = <client_secret>
+
+The stored refresh token is renewed by ytmusicapi automatically, so this
+setup only needs to be done once per account.
+
 Other configuration options are as follows:
 
 - :code:`auto_playlist_refresh` - time (in minutes) to refresh the Auto playlists.  Default: 60. Set to 0 to disable auto playlists.

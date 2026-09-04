@@ -57,7 +57,7 @@ class YTMusicBackend(
             self.auth = True
 
         if self.auth:
-            self.api = YTMusic(auth=str(self._ytmusicapi_auth_json))
+            self.api = YTMusic(**self._ytmusicapi_kwargs())
         else:
             self.api = YTMusic()
 
@@ -65,6 +65,63 @@ class YTMusicBackend(
         self.library = YTMusicLibraryProvider(backend=self)
         if self.auth:
             self.playlists = YTMusicPlaylistsProvider(backend=self)
+
+    def _ytmusicapi_kwargs(self):
+        """Return YTMusic() keyword args for the configured auth file.
+
+        Two kinds of auth files are supported:
+
+        - Browser headers dump (``mopidy ytmusic setup``): pass the file path.
+        - OAuth token file (``mopidy ytmusic oauth``): pass the file path
+          together with the configured ``oauth_client_id``/secret so
+          ytmusicapi can auto-refresh the access token indefinitely.
+        """
+        import json
+
+        auth_file = self._ytmusicapi_auth_json
+        try:
+            with open(auth_file) as file:
+                data = json.load(file)
+        except (OSError, ValueError):
+            logger.warning(
+                "YTMusic unable to read auth file %s, "
+                "falling back to default headers",
+                auth_file,
+            )
+            return {"auth": str(auth_file)}
+
+        # OAuth token files hold a refresh_token; browser header dumps do not.
+        if "refresh_token" in data:
+            client_id = self._ytmusic_config("oauth_client_id")
+            client_secret = self._ytmusic_config("oauth_client_secret")
+            if not client_id or not client_secret:
+                logger.error(
+                    "ytmusic.auth_json points to an OAuth token file but "
+                    "oauth_client_id/oauth_client_secret are not set in the "
+                    "[ytmusic] config section"
+                )
+                return {"auth": str(auth_file)}
+            from ytmusicapi import OAuthCredentials
+
+            return {
+                "auth": str(auth_file),
+                "oauth_credentials": OAuthCredentials(
+                    client_id=client_id,
+                    client_secret=client_secret,
+                ),
+            }
+        return {"auth": str(auth_file)}
+
+    def _ytmusic_config(self, key):
+        """Read a [ytmusic] config value defensively (dict or section)."""
+        section = self.config["ytmusic"]
+        try:
+            return section.get(key, None)
+        except AttributeError:
+            try:
+                return section[key]
+            except KeyError:
+                return None
 
     def on_start(self):
         if self._auto_playlist_refresh_rate:

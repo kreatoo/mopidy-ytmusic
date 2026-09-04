@@ -1,3 +1,4 @@
+import json
 import unittest
 from unittest import mock
 
@@ -12,6 +13,8 @@ class ExtensionTest(unittest.TestCase):
         config = {}
         config["enabled"] = True
         config["auth_json"] = ""
+        config["oauth_client_id"] = ""
+        config["oauth_client_secret"] = ""
         config["auto_playlist_refresh"] = 60
         config["youtube_player_refresh"] = 15
         config["playlist_item_limit"] = 1
@@ -78,4 +81,57 @@ class ExtensionTest(unittest.TestCase):
         backend = backend_lib.YTMusicBackend(ExtensionTest.get_config(), None)
         assert backend is not None
         backend.on_start()
+        backend.on_stop()
+
+    def test_init_backend_oauth(self):
+        # A token file with a refresh_token makes the backend use OAuth.
+        import tempfile
+
+        with tempfile.NamedTemporaryFile(
+            "w", suffix=".json", delete=False
+        ) as f:
+            json.dump(
+                {
+                    "scope": "https://www.googleapis.com/auth/youtube",
+                    "token_type": "Bearer",
+                    "access_token": "x",
+                    "refresh_token": "y",
+                    "expires_at": 9999999999,
+                    "expires_in": 3600,
+                },
+                f,
+            )
+            path = f.name
+        cfg = ExtensionTest.get_config()
+        cfg["ytmusic"]["auth_json"] = path
+        cfg["ytmusic"]["oauth_client_id"] = "id.apps.googleusercontent.com"
+        cfg["ytmusic"]["oauth_client_secret"] = "secret"
+        backend = backend_lib.YTMusicBackend(config=cfg, audio=None)
+        assert backend.api.auth_type.name == "OAUTH_CUSTOM_CLIENT"
+        backend.on_stop()
+
+    def test_init_backend_browser(self):
+        # A browser-headers dump keeps using plain file-path auth.
+        import tempfile
+
+        cookie = (
+            "SAPISID=abc; __Secure-3PAPISID=abc; "
+            "HSID=abc; SSID=abc; APISID=abc"
+        )
+        with tempfile.NamedTemporaryFile(
+            "w", suffix=".json", delete=False
+        ) as f:
+            json.dump(
+                {
+                    "cookie": cookie,
+                    "authorization": "SAPISIDHASH x",
+                    "x-goog-authuser": "0",
+                },
+                f,
+            )
+            path = f.name
+        cfg = ExtensionTest.get_config()
+        cfg["ytmusic"]["auth_json"] = path
+        backend = backend_lib.YTMusicBackend(config=cfg, audio=None)
+        assert backend.api.auth_type.name == "BROWSER"
         backend.on_stop()

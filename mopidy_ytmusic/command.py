@@ -79,6 +79,46 @@ def _reauth(filepath):
     return 0
 
 
+def _oauth_auth(filepath):
+    """Run the OAuth device flow and store a long-lived, self-refreshing token.
+
+    The token itself never needs to be re-pasted (ytmusicapi refreshes the
+    access token automatically), only this one-time authorization does.
+    """
+    from ytmusicapi import setup_oauth
+
+    path = Path(filepath)
+    print('Using "' + str(path) + '"')
+    if path.exists():
+        print("File already exists!")
+        return 1
+    client_id = input("Enter your Google OAuth client_id: ").strip()
+    client_secret = input("Enter your Google OAuth client_secret: ").strip()
+    if not client_id or not client_secret:
+        logger.error("client_id and client_secret are both required")
+        return 1
+    print("Opening your browser for authorization...")
+    try:
+        setup_oauth(
+            client_id,
+            client_secret,
+            filepath=str(path),
+            open_browser=True,
+        )
+    except Exception:
+        logger.exception("YTMusic OAuth setup failed")
+        return 1
+    print("OAuth token saved to {}".format(str(path)))
+    print("")
+    print("Update your mopidy.conf to reflect the new auth file:")
+    print("   [ytmusic]")
+    print("   enabled=true")
+    print("   auth_json=" + str(path))
+    print("   oauth_client_id=" + client_id)
+    print("   oauth_client_secret=" + client_secret)
+    return 0
+
+
 def get_command():
     """Return the CLI command for the running Mopidy version.
 
@@ -113,11 +153,24 @@ def get_command():
                 return 1
             return _reauth(str(path))
 
+    class OAuthCommand(commands.Command):
+        help = "Authorize once with Google OAuth (token auto-renews)"
+
+        def run(self, args, config):
+            filepath = input(
+                "Enter the path where you want to save oauth.json "
+                "[default=current dir]: "
+            )
+            if not filepath:
+                filepath = os.getcwd()
+            return _oauth_auth(filepath + "/oauth.json")
+
     class YTMusicCommand(commands.Command):
         def __init__(self):
             super().__init__()
             self.add_child("setup", SetupCommand())
             self.add_child("reauth", ReSetupCommand())
+            self.add_child("oauth", OAuthCommand())
 
     return YTMusicCommand()
 
@@ -147,5 +200,17 @@ def _build_cyclopts_command():
             logger.error("auth_json path not defined in config")
             return 1
         return _reauth(str(path))
+
+    @app.command(
+        help="Authorize once with Google OAuth (token auto-renews afterwards)."
+    )
+    def oauth() -> int:
+        filepath = input(
+            "Enter the path where you want to save oauth.json "
+            "[default=current dir]: "
+        )
+        if not filepath:
+            filepath = os.getcwd()
+        return _oauth_auth(filepath + "/oauth.json")
 
     return app
