@@ -112,11 +112,7 @@ class SubsonicHandler(tornado.web.RequestHandler):
         if method == "getMusicFolders":
             resp = _Response()
             folders = resp.child("musicFolders")
-            ET.SubElement(
-                folders,
-                f"{{{NS}}}musicFolder",
-                {"id": "1", "name": "Music"},
-            )
+            _child(folders, "musicFolder", id="1", name="Music")
             self.write_response(resp.text())
             return
         if method in ("getArtists", "getIndexes"):
@@ -202,9 +198,7 @@ class SubsonicHandler(tornado.web.RequestHandler):
             f"{{{NS}}}subsonic-response",
             {"status": "failed", "version": API_VERSION},
         )
-        ET.SubElement(
-            root, f"{{{NS}}}error", {"code": str(code), "message": str(message)}
-        )
+        _child(root, "error", code=code, message=message)
         self.set_header("Content-Type", "application/xml")
         self.write(ET.tostring(root, encoding="unicode"))
 
@@ -223,16 +217,10 @@ class SubsonicHandler(tornado.web.RequestHandler):
         for ref in sorted(refs, key=lambda r: r.name or ""):
             letter = (ref.name or "?")[0].upper()
             if letter != last_letter:
-                index = ET.SubElement(
-                    artists, f"{{{NS}}}index", {"name": letter}
-                )
+                index = _child(artists, "index", name=letter)
                 last_letter = letter
             _id = ref.uri.rsplit(":", 1)[-1]
-            ET.SubElement(
-                index,
-                f"{{{NS}}}artist",
-                {"id": _artist_id(_id), "name": ref.name},
-            )
+            _child(index, "artist", id=_artist_id(_id), name=ref.name)
         self.write_response(resp.text())
 
     def _get_artist(self):
@@ -296,23 +284,19 @@ class SubsonicHandler(tornado.web.RequestHandler):
         )
         for index, song in enumerate(album.get("tracks") or [], start=1):
             song_artists = song.get("artists") or []
-            ET.SubElement(
+            _child(
                 alb,
-                f"{{{NS}}}song",
-                {
-                    "id": _song_id(song.get("videoId")),
-                    "parent": self.get_argument("id"),
-                    "title": song.get("title"),
-                    "album": album.get("title"),
-                    "artist": (
-                        song_artists[0].get("name")
-                        if song_artists
-                        else artist_name
-                    ),
-                    "track": song.get("trackNumber") or index,
-                    "duration": str(song.get("duration_seconds") or 0),
-                    "coverArt": self.get_argument("id"),
-                },
+                "song",
+                id=_song_id(song.get("videoId")),
+                parent=self.get_argument("id"),
+                title=song.get("title"),
+                album=album.get("title"),
+                artist=(
+                    song_artists[0].get("name") if song_artists else artist_name
+                ),
+                track=song.get("trackNumber") or index,
+                duration=song.get("duration_seconds") or 0,
+                coverArt=self.get_argument("id"),
             )
         self.write_response(resp.text())
 
@@ -435,21 +419,19 @@ class SubsonicHandler(tornado.web.RequestHandler):
         search = resp.child("searchResult3")
         for r in results:
             if r.get("resultType") == "song":
-                ET.SubElement(
+                _child(
                     search,
-                    f"{{{NS}}}song",
-                    {
-                        "id": _song_id(r.get("videoId")),
-                        "title": r.get("title"),
-                        "artist": (r.get("artists") or [{}])[0].get("name"),
-                        "album": (r.get("album") or {}).get("name"),
-                        "duration": str(r.get("duration_seconds") or 0),
-                        "coverArt": (
-                            _album_id((r.get("album") or {}).get("id"))
-                            if (r.get("album") or {}).get("id")
-                            else None
-                        ),
-                    },
+                    "song",
+                    id=_song_id(r.get("videoId")),
+                    title=r.get("title"),
+                    artist=(r.get("artists") or [{}])[0].get("name"),
+                    album=(r.get("album") or {}).get("name"),
+                    duration=r.get("duration_seconds") or 0,
+                    coverArt=(
+                        _album_id((r.get("album") or {}).get("id"))
+                        if (r.get("album") or {}).get("id")
+                        else None
+                    ),
                 )
             elif r.get("resultType") == "album":
                 _child(
@@ -486,18 +468,14 @@ class SubsonicHandler(tornado.web.RequestHandler):
                 owner=self.fe.config["ytmusic"]["subsonic_username"] or None,
             )
             for track in pl.tracks:
-                ET.SubElement(
+                _child(
                     node,
-                    f"{{{NS}}}entry",
-                    {
-                        "id": _song_id(track.uri.split(":")[-1]),
-                        "parent": playlist_id,
-                        "title": track.name,
-                        "artist": (
-                            track.artists[0].name if track.artists else None
-                        ),
-                        "album": track.album.name if track.album else None,
-                    },
+                    "entry",
+                    id=_song_id(track.uri.split(":")[-1]),
+                    parent=playlist_id,
+                    title=track.name,
+                    artist=track.artists[0].name if track.artists else None,
+                    album=track.album.name if track.album else None,
                 )
         else:
             refs = core.playlists.as_list().get() or []
@@ -505,11 +483,7 @@ class SubsonicHandler(tornado.web.RequestHandler):
             playlists = resp.child("playlists")
             for ref in refs:
                 pid = _playlist_id(ref.uri.split(":")[-1])
-                ET.SubElement(
-                    playlists,
-                    f"{{{NS}}}playlist",
-                    {"id": pid, "name": ref.name},
-                )
+                _child(playlists, "playlist", id=pid, name=ref.name)
         self.write_response(resp.text())
 
     def _get_album_list2(self):
@@ -527,14 +501,12 @@ class SubsonicHandler(tornado.web.RequestHandler):
         resp = _Response()
         node = resp.child("albumList2")
         for bid, name in albums.items():
-            ET.SubElement(
+            _child(
                 node,
-                f"{{{NS}}}album",
-                {
-                    "id": _album_id(bid),
-                    "name": name,
-                    "coverArt": _album_id(bid),
-                },
+                "album",
+                id=_album_id(bid),
+                name=name,
+                coverArt=_album_id(bid),
             )
         self.write_response(resp.text())
 
