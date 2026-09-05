@@ -25,6 +25,11 @@ class ExtensionTest(unittest.TestCase):
         config["enable_scrobbling"] = False
         config["enable_radio"] = True
         config["auto_radio"] = True
+        config["enable_subsonic"] = False
+        config["subsonic_host"] = "127.0.0.1"
+        config["subsonic_port"] = 4533
+        config["subsonic_username"] = "mopidy"
+        config["subsonic_password"] = "mopidy"
         config["stream_preference"] = ["141", "251", "140", "250", "249"]
         config["verify_track_url"] = True
         return {"ytmusic": config, "proxy": {}}
@@ -46,6 +51,7 @@ class ExtensionTest(unittest.TestCase):
         assert "enable_scrobbling = yes" in config
         assert "enable_radio = yes" in config
         assert "auto_radio = yes" in config
+        assert "enable_subsonic = no" in config
         assert "stream_preference = 141, 251, 140, 250, 249" in config
         assert "verify_track_url = yes" in config
 
@@ -65,6 +71,11 @@ class ExtensionTest(unittest.TestCase):
         assert "enable_scrobbling" in schema
         assert "enable_radio" in schema
         assert "auto_radio" in schema
+        assert "enable_subsonic" in schema
+        assert "subsonic_host" in schema
+        assert "subsonic_port" in schema
+        assert "subsonic_username" in schema
+        assert "subsonic_password" in schema
         assert "stream_preference" in schema
         assert "verify_track_url" in schema
 

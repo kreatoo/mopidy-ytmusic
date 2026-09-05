@@ -113,6 +113,11 @@ class Extension(ext.Extension):
         schema["enable_scrobbling"] = config.Boolean(optional=True)
         schema["enable_radio"] = config.Boolean(optional=True)
         schema["auto_radio"] = config.Boolean(optional=True)
+        schema["enable_subsonic"] = config.Boolean(optional=True)
+        schema["subsonic_host"] = config.String(optional=True)
+        schema["subsonic_port"] = config.Integer(optional=True)
+        schema["subsonic_username"] = config.String(optional=True)
+        schema["subsonic_password"] = config.String(optional=True)
         schema["stream_preference"] = config.List(optional=True)
         schema["verify_track_url"] = config.Boolean(optional=True)
         return schema
@@ -126,7 +131,9 @@ class Extension(ext.Extension):
         from .backend import YTMusicBackend
         from .radio_fe import YTMusicRadioFE
         from .scrobble_fe import YTMusicScrobbleFE
+        from .subsonic_fe import YTMusicSubsonicFE
 
         registry.add("backend", YTMusicBackend)
         registry.add("frontend", YTMusicScrobbleFE)
         registry.add("frontend", YTMusicRadioFE)
+        registry.add("frontend", YTMusicSubsonicFE)

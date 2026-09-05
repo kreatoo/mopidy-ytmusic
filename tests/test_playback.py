@@ -10,12 +10,9 @@ class PlaybackTest(unittest.TestCase):
             {"format_id": "251", "acodec": "opus", "abr": 150},
             {"format_id": "136", "acodec": "none", "abr": None},
         ]
-        backend = mock_backend(stream_preference=["141", "251", "140"])
-        provider = playback_lib.YTMusicPlaybackProvider.__new__(
-            playback_lib.YTMusicPlaybackProvider
+        picked = playback_lib._pick_stream(
+            formats, stream_preference=["141", "251", "140"]
         )
-        provider.backend = backend
-        picked = provider._pick_stream(formats)
         assert picked["format_id"] == "251"
 
     def test_pick_stream_highest_bitrate(self):
@@ -24,25 +21,8 @@ class PlaybackTest(unittest.TestCase):
             {"format_id": "251", "acodec": "opus", "abr": 150},
             {"format_id": "136", "acodec": "none", "abr": None},
         ]
-        provider = playback_lib.YTMusicPlaybackProvider.__new__(
-            playback_lib.YTMusicPlaybackProvider
-        )
-        provider.backend = mock_backend(stream_preference=[])
-        picked = provider._pick_stream(formats)
+        picked = playback_lib._pick_stream(formats, stream_preference=[])
         assert picked["format_id"] == "251"
 
     def test_pick_stream_empty(self):
-        provider = playback_lib.YTMusicPlaybackProvider.__new__(
-            playback_lib.YTMusicPlaybackProvider
-        )
-        provider.backend = mock_backend(stream_preference=[])
-        assert provider._pick_stream([]) is None
-
-
-def mock_backend(stream_preference):
-    class Backend:
-        pass
-
-    backend = Backend()
-    backend.stream_preference = stream_preference
-    return backend
+        assert playback_lib._pick_stream([], stream_preference=[]) is None

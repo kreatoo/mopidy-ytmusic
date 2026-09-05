@@ -6,6 +6,10 @@ v0.4.0
 
 Revival release: makes the extension work with the current ecosystem.
 
+- OpenSubsonic server frontend (`enable_subsonic`): serve the Subsonic API
+  so clients like Nocturne/DSub/Sublime Music can browse and stream your
+  Mopidy backends (getArtists/getArtist/getAlbum/getSong/getCoverArt/
+  stream/search3/getPlaylists/...); auth via subsonic_username/password
 - Radio: endless recommendations — browse "Radio" at the root (or
   `mopidy: browse ytmusic:radio:<track>`/`ytmusic:radio`), and with
   `auto_radio = yes` the queue automatically continues with a fresh

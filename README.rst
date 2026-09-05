@@ -114,6 +114,13 @@ Other configuration options are as follows:
 - :code:`enable_scrobbling` - Mark tracks as played on YouTube Music after listening.  Default: yes
 - :code:`stream_preference` - Comma separated list of itags in the order of preference you want for stream.  Default: "141, 251, 140, 250, 249"
 - :code:`verify_track_url` - Verify that track url is valid before sending to mopidy. Default: yes.  There should be no need to set this to no.
+- :code:`enable_subsonic` - Serve the OpenSubsonic API so Subsonic clients
+  (Nocturne, DSub, Sublime Music, ...) can browse and play your Mopidy
+  backends. Default: no
+- :code:`subsonic_host` / :code:`subsonic_port` - Where the Subsonic server
+  listens (default: 127.0.0.1:4533)
+- :code:`subsonic_username` / :code:`subsonic_password` - Credentials
+  Subsonic clients must use (default: mopidy/mopidy)
 
 Info on YouTube Music streams:
 
