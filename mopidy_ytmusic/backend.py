@@ -1,5 +1,6 @@
 import hashlib
 import random
+import threading
 import time
 from datetime import datetime, timezone
 
@@ -26,6 +27,27 @@ from .playlist import YTMusicPlaylistsProvider
 from .repeating_timer import RepeatingTimer
 from .scrobble_fe import YTMusicScrobbleListener
 
+_shared_api = None
+_api_lock = threading.Lock()
+
+
+def set_shared_api(api):
+    """Expose the backend's YTMusic client to other actors (radio frontend)."""
+    global _shared_api
+    with _api_lock:
+        _shared_api = api
+
+
+def get_shared_api():
+    """Return the backend's YTMusic client, creating a guest fallback."""
+    global _shared_api
+    with _api_lock:
+        if _shared_api is None:
+            from ytmusicapi.ytmusic import YTMusic
+
+            _shared_api = YTMusic()
+        return _shared_api
+
 
 class YTMusicBackend(
     pykka.ThreadingActor, backend.Backend, YTMusicScrobbleListener
@@ -49,6 +71,7 @@ class YTMusicBackend(
         self.history = config["ytmusic"]["enable_history"]
         self.liked_songs = config["ytmusic"]["enable_liked_songs"]
         self.mood_genre = config["ytmusic"]["enable_mood_genre"]
+        self.enable_radio = config["ytmusic"]["enable_radio"]
         self.stream_preference = config["ytmusic"]["stream_preference"]
         self.verify_track_url = config["ytmusic"]["verify_track_url"]
 
@@ -60,6 +83,7 @@ class YTMusicBackend(
             self.api = YTMusic(**self._ytmusicapi_kwargs())
         else:
             self.api = YTMusic()
+        set_shared_api(self.api)
 
         self.playback = YTMusicPlaybackProvider(audio=audio, backend=self)
         self.library = YTMusicLibraryProvider(backend=self)

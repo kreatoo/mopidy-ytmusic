@@ -49,6 +49,8 @@ class YTMusicLibraryProvider(backend.LibraryProvider):
                             uri="ytmusic:subscriptions", name="Subscriptions"
                         )
                     )
+            if self.backend.enable_radio:
+                dirs.append(Ref.directory(uri="ytmusic:radio", name="Radio"))
             dirs.append(
                 Ref.directory(
                     uri="ytmusic:watch", name="Similar to last played"
@@ -200,6 +202,26 @@ class YTMusicLibraryProvider(backend.LibraryProvider):
                         ]
             except Exception:
                 logger.exception("YTMusic failed getting watch songs")
+        elif uri == "ytmusic:radio":
+            try:
+                track_id = None
+                playback = self.backend.playback
+                if playback.last_id is not None:
+                    track_id = playback.last_id
+                elif self.backend.auth:
+                    hist = self.backend.api.get_history()
+                    track_id = hist[0]["videoId"]
+                if track_id:
+                    logger.debug('YTMusic loading radio for "%s"', track_id)
+                    return self._radio_refs(track_id)
+            except Exception:
+                logger.exception("YTMusic failed loading radio")
+        elif uri.startswith("ytmusic:radio:"):
+            try:
+                track_id = uri.split(":")[2]
+                return self._radio_refs(track_id)
+            except Exception:
+                logger.exception('YTMusic failed getting radio for "%s"', uri)
         elif uri == "ytmusic:mood":
             try:
                 logger.debug("YTMusic loading mood/genre playlists")
@@ -1313,6 +1335,27 @@ class YTMusicLibraryProvider(backend.LibraryProvider):
             artists=list(sartists),
             albums=list(salbums),
         )
+
+    def _radio_refs(self, track_id):
+        """Refs for a YouTube Music radio seeded from a track."""
+        from .backend import get_shared_api
+
+        res = get_shared_api().get_watch_playlist(
+            track_id,
+            radio=True,
+            limit=self.backend.playlist_item_limit,
+        )
+        tracks = self.playlistToTracks(res)
+        seed_uri = f"ytmusic:track:{track_id}"
+        refs = [
+            Ref.track(uri=t.uri, name=t.name)
+            for t in tracks
+            if t.uri != seed_uri
+        ]
+        logger.debug(
+            "YTMusic radio returned %d tracks for %s", len(refs), track_id
+        )
+        return refs
 
 
 def parse_uri(uri):

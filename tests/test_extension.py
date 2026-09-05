@@ -23,6 +23,8 @@ class ExtensionTest(unittest.TestCase):
         config["enable_liked_songs"] = False
         config["enable_mood_genre"] = True
         config["enable_scrobbling"] = False
+        config["enable_radio"] = True
+        config["auto_radio"] = True
         config["stream_preference"] = ["141", "251", "140", "250", "249"]
         config["verify_track_url"] = True
         return {"ytmusic": config, "proxy": {}}
@@ -42,6 +44,8 @@ class ExtensionTest(unittest.TestCase):
         assert "enable_liked_songs = yes" in config
         assert "enable_mood_genre = yes" in config
         assert "enable_scrobbling = yes" in config
+        assert "enable_radio = yes" in config
+        assert "auto_radio = yes" in config
         assert "stream_preference = 141, 251, 140, 250, 249" in config
         assert "verify_track_url = yes" in config
 
@@ -59,6 +63,8 @@ class ExtensionTest(unittest.TestCase):
         assert "enable_liked_songs" in schema
         assert "enable_mood_genre" in schema
         assert "enable_scrobbling" in schema
+        assert "enable_radio" in schema
+        assert "auto_radio" in schema
         assert "stream_preference" in schema
         assert "verify_track_url" in schema
 

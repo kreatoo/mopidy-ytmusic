@@ -111,6 +111,8 @@ class Extension(ext.Extension):
         schema["enable_liked_songs"] = config.Boolean(optional=True)
         schema["enable_mood_genre"] = config.Boolean(optional=True)
         schema["enable_scrobbling"] = config.Boolean(optional=True)
+        schema["enable_radio"] = config.Boolean(optional=True)
+        schema["auto_radio"] = config.Boolean(optional=True)
         schema["stream_preference"] = config.List(optional=True)
         schema["verify_track_url"] = config.Boolean(optional=True)
         return schema
@@ -122,7 +124,9 @@ class Extension(ext.Extension):
 
     def setup(self, registry):
         from .backend import YTMusicBackend
+        from .radio_fe import YTMusicRadioFE
         from .scrobble_fe import YTMusicScrobbleFE
 
         registry.add("backend", YTMusicBackend)
         registry.add("frontend", YTMusicScrobbleFE)
+        registry.add("frontend", YTMusicRadioFE)

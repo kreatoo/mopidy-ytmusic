@@ -5,6 +5,11 @@ v0.4.0
 ========================================
 
 Revival release: makes the extension work with the current ecosystem.
+
+- Radio: endless recommendations — browse "Radio" at the root (or
+  `mopidy: browse ytmusic:radio:<track>`/`ytmusic:radio`), and with
+  `auto_radio = yes` the queue automatically continues with a fresh
+  batch of YouTube Music recommendations when it ends
 - Sanitize auth headers written by `mopidy ytmusic setup`: strip
   `content-encoding`/`host`/`content-length` which otherwise make YouTube
   reject requests with HTTP 400

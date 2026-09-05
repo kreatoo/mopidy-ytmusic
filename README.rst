@@ -106,6 +106,11 @@ Other configuration options are as follows:
 - :code:`enable_history` - Show Recently Played playlist. Default: yes
 - :code:`enable_like_songs` - Show Liked Songs playlist. Default: yes
 - :code:`enable_mood_genre` - Show Mood & Genre playlists from YouTube Music's Explore directory. Default: yes
+- :code:`enable_radio` - Show a :code:`Radio` entry in the root browse and
+  enable :code:`ytmusic:radio` URIs. Default: yes
+- :code:`auto_radio` - When the queue ends, automatically continue playing
+  with a fresh batch of YouTube Music recommendations (endless radio).
+  Default: yes
 - :code:`enable_scrobbling` - Mark tracks as played on YouTube Music after listening.  Default: yes
 - :code:`stream_preference` - Comma separated list of itags in the order of preference you want for stream.  Default: "141, 251, 140, 250, 249"
 - :code:`verify_track_url` - Verify that track url is valid before sending to mopidy. Default: yes.  There should be no need to set this to no.
