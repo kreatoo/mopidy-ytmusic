@@ -84,20 +84,19 @@ class SubsonicHandler(tornado.web.RequestHandler):
     def initialize(self, fe):
         self.fe = fe
 
-    def get(self):
+    def get(self, method):
         try:
-            self._handle()
+            self._handle(method)
         except _ApiError as e:
             self._error(*e.args)
         except Exception:
             logger.exception("Subsonic request failed")
             self._error(0, "Internal server error")
 
-    def _handle(self):
+    def _handle(self, method):
         self._check_auth()
 
-        method = (self.path_args or [""])[0]
-        if method in ("ping",):
+        if method == "ping":
             self.write_response("")
             return
         if method in ("getLicense",):
