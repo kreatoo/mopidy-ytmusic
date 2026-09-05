@@ -7,6 +7,7 @@
 # search3, getPlaylists, getPlaylist, getStarred(2), getRandomSongs,
 # getAlbumList2, scrobble.
 import threading
+import time
 from xml.etree import ElementTree as ET
 
 import pykka
@@ -43,6 +44,23 @@ def _split(sid):
     """Split a subsonic id of the form <type>_<payload>."""
     kind, _, payload = sid.partition("_")
     return kind, payload
+
+
+_API_CACHE = {}
+_API_CACHE_LOCK = threading.RLock()
+
+
+def _cached(key, ttl, callback):
+    """Cache YTMusic API responses briefly to avoid duplicate UI requests."""
+    now = time.monotonic()
+    with _API_CACHE_LOCK:
+        cached = _API_CACHE.get(key)
+        if cached and cached[0] > now:
+            return cached[1]
+    value = callback()
+    with _API_CACHE_LOCK:
+        _API_CACHE[key] = (now + ttl, value)
+    return value
 
 
 def _largest(thumbnails):
@@ -220,14 +238,10 @@ class SubsonicHandler(tornado.web.RequestHandler):
             self._get_playlist()
             return
         if method in ("getStarred", "getStarred2"):
-            resp = _Response()
-            resp.child("starred")
-            self.write_response(resp.text())
+            self._get_starred()
             return
         if method == "getRandomSongs":
-            resp = _Response()
-            resp.child("randomSongs")
-            self.write_response(resp.text())
+            self._get_random_songs()
             return
         if method == "getAlbumList2":
             self._get_album_list2()
@@ -350,7 +364,11 @@ class SubsonicHandler(tornado.web.RequestHandler):
         if kind != "ar":
             raise _ApiError(41, "Not an artist id")
         try:
-            data = self._api().get_artist(payload)
+            data = _cached(
+                ("artist", payload),
+                300,
+                lambda: self._api().get_artist(payload),
+            )
         except Exception:
             raise _ApiError(70, "Artist not found")
         resp = _Response()
@@ -387,7 +405,9 @@ class SubsonicHandler(tornado.web.RequestHandler):
         if kind != "al":
             raise _ApiError(41, "Not an album id")
         try:
-            data = self._api().get_album(payload)
+            data = _cached(
+                ("album", payload), 300, lambda: self._api().get_album(payload)
+            )
         except Exception:
             raise _ApiError(70, "Album not found")
         album = data
@@ -427,7 +447,9 @@ class SubsonicHandler(tornado.web.RequestHandler):
         if kind != "st":
             raise _ApiError(41, "Not a song id")
         try:
-            data = self._api().get_song(payload)
+            data = _cached(
+                ("song", payload), 300, lambda: self._api().get_song(payload)
+            )
         except Exception:
             raise _ApiError(70, "Song not found")
         details = data.get("videoDetails") or {}
@@ -446,7 +468,11 @@ class SubsonicHandler(tornado.web.RequestHandler):
         info = {}
         if kind == "al":
             try:
-                data = self._api().get_album(payload)
+                data = _cached(
+                    ("album", payload),
+                    300,
+                    lambda: self._api().get_album(payload),
+                )
                 artists = data.get("artists") or []
                 info = {
                     "name": data.get("title"),
@@ -465,7 +491,11 @@ class SubsonicHandler(tornado.web.RequestHandler):
         info = {}
         if kind == "ar":
             try:
-                data = self._api().get_artist(payload)
+                data = _cached(
+                    ("artist", payload),
+                    300,
+                    lambda: self._api().get_artist(payload),
+                )
                 info = {
                     "name": data.get("name"),
                     "artistImageUrl": _largest(data.get("thumbnails")),
@@ -485,11 +515,20 @@ class SubsonicHandler(tornado.web.RequestHandler):
                 url = _largest(self._api().get_album(payload).get("thumbnails"))
             elif kind == "ar":
                 url = _largest(
-                    self._api().get_artist(payload).get("thumbnails")
+                    _cached(
+                        ("artist", payload),
+                        300,
+                        lambda: self._api().get_artist(payload),
+                    ).get("thumbnails")
                 )
             elif kind == "st":
                 details = (
-                    self._api().get_song(payload).get("videoDetails") or {}
+                    _cached(
+                        ("song", payload),
+                        300,
+                        lambda: self._api().get_song(payload),
+                    ).get("videoDetails")
+                    or {}
                 )
                 url = _largest(
                     (details.get("thumbnail") or {}).get("thumbnails")
@@ -534,7 +573,11 @@ class SubsonicHandler(tornado.web.RequestHandler):
     def _search3(self):
         query = self.get_argument("query", "")
         try:
-            results = self._api().search(query, limit=20) or []
+            results = _cached(
+                ("search", query),
+                60,
+                lambda: self._api().search(query, limit=20) or [],
+            )
         except Exception:
             logger.exception("Subsonic search failed")
             results = []
@@ -612,11 +655,74 @@ class SubsonicHandler(tornado.web.RequestHandler):
                 _child(playlists, "playlist", id=pid, name=ref.name)
         self.write_response(resp.text())
 
+    def _song_element(self, container, song, parent=None):
+        """Append a Subsonic song entry from a YTMusic track dictionary."""
+        video_id = song.get("videoId") or song.get("video_id")
+        if not video_id:
+            return
+        artists = song.get("artists") or []
+        album = song.get("album") or {}
+        _child(
+            container,
+            "song",
+            id=_song_id(video_id),
+            parent=parent,
+            title=song.get("title") or song.get("name"),
+            artist=(artists[0].get("name") if artists else song.get("artist")),
+            album=album.get("name") or song.get("album_name"),
+            albumId=_album_id(album["id"]) if album.get("id") else None,
+            duration=song.get("duration_seconds") or song.get("duration") or 0,
+            track=song.get("trackNumber") or song.get("track_number"),
+            coverArt=_album_id(album["id"]) if album.get("id") else None,
+        )
+
+    def _get_random_songs(self):
+        # YTMusic has no random endpoint; use the user's recent history as a
+        # fast, useful local approximation instead of returning an empty home.
+        try:
+            history = list(
+                _cached(("history",), 30, lambda: self._api().get_history())
+                or []
+            )
+        except Exception:
+            history = []
+        resp = _Response()
+        node = resp.child("randomSongs")
+        count = int(self.get_argument("size", "20"))
+        for song in history[: max(0, min(count, 50))]:
+            self._song_element(node, song)
+        self.write_response(resp.text())
+
+    def _get_starred(self):
+        try:
+            liked = (
+                _cached(
+                    ("liked",),
+                    60,
+                    lambda: self._api().get_liked_songs(limit=100),
+                )
+                or {}
+            )
+            songs = (
+                liked.get("tracks", liked) if isinstance(liked, dict) else liked
+            )
+        except Exception:
+            logger.debug("Subsonic getStarred failed", exc_info=True)
+            songs = []
+        resp = _Response()
+        node = resp.child("starred")
+        for song in songs or []:
+            self._song_element(node, song)
+        self.write_response(resp.text())
+
     def _get_album_list2(self):
         # Home-screen lists; back them with recently played YTM albums.
         albums = {}
         try:
-            for h in self._api().get_history() or []:
+            for h in (
+                _cached(("history",), 30, lambda: self._api().get_history())
+                or []
+            ):
                 album = h.get("album") or {}
                 if album.get("id") and album["id"] not in albums:
                     albums[album["id"]] = album.get("name")
@@ -682,10 +788,19 @@ class SubsonicHandler(tornado.web.RequestHandler):
         node = resp.child("similarSongs")
         try:
             if kind == "ar":
-                data = self._api().get_artist(payload)
+                data = _cached(
+                    ("artist", payload),
+                    300,
+                    lambda: self._api().get_artist(payload),
+                )
             elif kind == "st" and payload:
                 details = (
-                    self._api().get_song(payload).get("videoDetails") or {}
+                    _cached(
+                        ("song", payload),
+                        300,
+                        lambda: self._api().get_song(payload),
+                    ).get("videoDetails")
+                    or {}
                 )
                 channel_id = details.get("channelId")
                 data = self._api().get_artist(channel_id) if channel_id else {}
