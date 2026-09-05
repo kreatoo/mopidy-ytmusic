@@ -97,7 +97,7 @@ class SubsonicHandler(tornado.web.RequestHandler):
         self._check_auth()
 
         if method == "ping":
-            self.write_response("")
+            self.write_response(_Response().text())
             return
         if method in ("getLicense",):
             resp = _Response()
