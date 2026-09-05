@@ -100,10 +100,9 @@ def _to_json(root):
     for child in root:
         key = child.tag.split("}")[-1]
         cval = _el_to_value(child)
-        if key in _ARRAY_TAGS:
-            children.setdefault(key, []).append(cval)
-        else:
-            children[key] = cval
+        # Top-level objects (artist, album, song, playlist) are objects;
+        # array-ness applies to their nested item children only.
+        children[key] = cval
     response.update(children)
     return {"subsonic-response": response}
 

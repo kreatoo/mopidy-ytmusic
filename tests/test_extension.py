@@ -178,6 +178,12 @@ class SubsonicTest(unittest.TestCase):
         idx = data2["subsonic-response"]["artists"]["index"]
         assert [a["id"] for a in idx[0]["artist"]] == ["ar_x", "ar_y"]
 
+        resp3 = _Response()
+        _child(resp3.root, "artist", id="ar_x", name="X")
+        assert isinstance(
+            _to_json(resp3.root)["subsonic-response"]["artist"], dict
+        )
+
     def test_token_auth(self):
         import hashlib
 
