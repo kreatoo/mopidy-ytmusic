@@ -60,6 +60,65 @@ def _child(container, tag, **attrs):
     return el
 
 
+# Elements whose OpenSubsonic JSON is always an array even with one entry.
+_CONTAINER_TAGS = {
+    "musicFolders",
+    "artists",
+    "indexes",
+    "searchResult2",
+    "searchResult3",
+    "albumList",
+    "albumList2",
+    "playlists",
+    "starred",
+    "randomSongs",
+    "similarSongs",
+    "topSongs",
+    "songs",
+    "newest",
+    "recent",
+    "frequent",
+    "highest",
+    "genre",
+}
+
+
+def _el_to_value(el):
+    """Convert an XML element to the OpenSubsonic JSON representation."""
+    if len(el) == 0 and not el.attrib:
+        return el.text or ""
+    value = dict(el.attrib)
+    for child in el:
+        key = child.tag.split("}")[-1]
+        cval = _el_to_value(child)
+        if key in value:
+            if not isinstance(value[key], list):
+                value[key] = [value[key]]
+            value[key].append(cval)
+        else:
+            value[key] = cval
+    return value
+
+
+def _to_json(root):
+    response = {"status": root.get("status"), "version": root.get("version")}
+    body = {}
+    for child in root:
+        key = child.tag.split("}")[-1]
+        values = [_el_to_value(child)]
+        if key in body:
+            body[key] = (
+                body[key] if isinstance(body[key], list) else [body[key]]
+            )
+            body[key].extend(values)
+        elif child.tag.split("}")[-1] in _CONTAINER_TAGS:
+            body[key] = values
+        else:
+            body[key] = values[0]
+    response.update(body)
+    return {"subsonic-response": response}
+
+
 class _Response:
     """Very small builder for the subsonic XML envelope."""
 
@@ -79,6 +138,11 @@ class _Response:
 
     def text(self):
         return ET.tostring(self.root, encoding="unicode")
+
+    def json(self):
+        import json as _json
+
+        return _json.dumps(_to_json(self.root))
 
 
 class _ApiError(Exception):
@@ -100,6 +164,7 @@ class SubsonicHandler(tornado.web.RequestHandler):
 
     def _handle(self, method):
         self._check_auth()
+        self._json_mode = self.get_argument("f", "xml") == "json"
 
         if method == "ping":
             self.write_response(_Response().text())
@@ -158,8 +223,31 @@ class SubsonicHandler(tornado.web.RequestHandler):
         if method == "getAlbumList2":
             self._get_album_list2()
             return
+        if method == "getTopSongs":
+            self._get_top_songs()
+            return
+        if method == "getSimilarSongs":
+            self._get_similar_songs()
+            return
         if method == "scrobble":
             self._scrobble()
+            return
+        if method in (
+            "getLyricsBySongId",
+            "getPlayQueue",
+            "savePlayQueue",
+            "star",
+            "unstar",
+            "setRating",
+            "createPlaylist",
+            "updatePlaylist",
+            "deletePlaylist",
+            "createInternetRadioStation",
+            "updateInternetRadioStation",
+            "deleteInternetRadioStation",
+            "getInternetRadioStations",
+        ):
+            self.write_response(_Response())
             return
         self._error(0, f"Method not implemented: {method}")
 
@@ -168,6 +256,8 @@ class SubsonicHandler(tornado.web.RequestHandler):
     def _check_auth(self):
         username = self.get_argument("u", "")
         password = self.get_argument("p", "")
+        token = self.get_argument("t", "")
+        salt = self.get_argument("s", "")
         cfg_user = self.fe.config["ytmusic"]["subsonic_username"]
         cfg_pass = self.fe.config["ytmusic"]["subsonic_password"]
         if not (cfg_user and cfg_pass):
@@ -175,15 +265,22 @@ class SubsonicHandler(tornado.web.RequestHandler):
             return
         if username != cfg_user:
             raise _ApiError(40, "Wrong username or password")
-        # Subsonic accepts plain passwords or "enc:" + hex(md5(password)).
         import hashlib
 
         if password == cfg_pass:
             return
-        if password.startswith("enc:"):
-            digest = hashlib.md5(cfg_pass.encode()).hexdigest()
-            if password[4:] == digest:
-                return
+        if (
+            password.startswith("enc:")
+            and password[4:] == hashlib.md5(cfg_pass.encode()).hexdigest()
+        ):
+            return
+        # OpenSubsonic salted token: t = md5(password + salt)
+        if (
+            token
+            and salt
+            and token == hashlib.md5((cfg_pass + salt).encode()).hexdigest()
+        ):
+            return
         raise _ApiError(40, "Wrong username or password")
 
     def _api(self):
@@ -199,12 +296,28 @@ class SubsonicHandler(tornado.web.RequestHandler):
             {"status": "failed", "version": API_VERSION},
         )
         _child(root, "error", code=code, message=message)
-        self.set_header("Content-Type", "application/xml")
-        self.write(ET.tostring(root, encoding="unicode"))
+        if getattr(self, "_json_mode", False):
+            import json as _json
 
-    def write_response(self, xml_text):
-        self.set_header("Content-Type", "application/xml")
-        self.write(xml_text)
+            self.set_header("Content-Type", "application/json")
+            self.write(_json.dumps(_to_json(root)))
+        else:
+            self.set_header("Content-Type", "application/xml")
+            self.write(ET.tostring(root, encoding="unicode"))
+
+    def write_response(self, resp):
+        xml_text = resp if isinstance(resp, str) else resp.text()
+        if getattr(self, "_json_mode", False):
+            tree = (
+                ET.fromstring(xml_text) if isinstance(resp, str) else resp.root
+            )
+            import json as _json
+
+            self.set_header("Content-Type", "application/json")
+            self.write(_json.dumps(_to_json(tree)))
+        else:
+            self.set_header("Content-Type", "application/xml")
+            self.write(xml_text)
 
     # ------------------------------------------------------------------
 
@@ -310,13 +423,14 @@ class SubsonicHandler(tornado.web.RequestHandler):
             raise _ApiError(70, "Song not found")
         details = data.get("videoDetails") or {}
         resp = _Response()
-        song = resp.child("song", id=self.get_argument("id"))
-        ET.SubElement(song, f"{{{NS}}}title").text = details.get("title")
-        ET.SubElement(song, f"{{{NS}}}artist").text = details.get("author")
-        ET.SubElement(song, f"{{{NS}}}duration").text = str(
-            details.get("lengthSeconds") or 0
+        resp.child(
+            "song",
+            id=self.get_argument("id"),
+            title=details.get("title"),
+            artist=details.get("author"),
+            duration=details.get("lengthSeconds") or 0,
         )
-        self.write_response(resp.text())
+        self.write_response(resp)
 
     def _get_album_info2(self):
         kind, payload = _split(self.get_argument("id"))
@@ -512,6 +626,53 @@ class SubsonicHandler(tornado.web.RequestHandler):
                 coverArt=_album_id(bid),
             )
         self.write_response(resp.text())
+
+    def _get_top_songs(self):
+        kind, payload = _split(self.get_argument("id"))
+        resp = _Response()
+        node = resp.child("topSongs")
+        if kind == "ar":
+            try:
+                data = self._api().get_artist(payload)
+                for s in (data.get("songs") or {}).get("results") or []:
+                    _child(
+                        node,
+                        "song",
+                        id=_song_id(s.get("videoId")),
+                        title=s.get("title"),
+                        artist=(
+                            (s.get("artists") or [{}])[0].get("name")
+                            if s.get("artists")
+                            else None
+                        ),
+                        duration=s.get("duration_seconds") or 0,
+                    )
+            except Exception:
+                logger.debug("Subsonic getTopSongs failed for %s", payload)
+        self.write_response(resp)
+
+    def _get_similar_songs(self):
+        kind, payload = _split(self.get_argument("id"))
+        resp = _Response()
+        node = resp.child("similarSongs")
+        try:
+            if kind == "ar":
+                data = self._api().get_artist(payload)
+            else:
+                details = (
+                    self._api().get_song(payload).get("videoDetails") or {}
+                )
+                data = self._api().get_artist(details.get("channelId"))
+            for r in (data.get("related") or {}).get("results") or []:
+                _child(
+                    node,
+                    "song",
+                    id=_artist_id(r.get("browseId")),
+                    title=r.get("title"),
+                )
+        except Exception:
+            logger.debug("Subsonic getSimilarSongs failed for %s", payload)
+        self.write_response(resp)
 
     def _scrobble(self):
         kind, payload = _split(self.get_argument("id"))

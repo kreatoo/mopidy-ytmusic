@@ -152,3 +152,52 @@ class ExtensionTest(unittest.TestCase):
         backend = backend_lib.YTMusicBackend(config=cfg, audio=None)
         assert backend.api.auth_type.name == "BROWSER"
         backend.on_stop()
+
+
+class SubsonicTest(unittest.TestCase):
+    def test_json_conversion(self):
+        from mopidy_ytmusic.subsonic_fe import _Response, _child, _to_json
+
+        resp = _Response()
+        folders = resp.child("musicFolders")
+        _child(folders, "musicFolder", id="1", name="Music")
+        root = resp.root
+        data = _to_json(root)
+        assert data["subsonic-response"]["status"] == "ok"
+        mf = data["subsonic-response"]["musicFolders"][0]
+        assert mf[0]["id"] == "1" and mf[0]["name"] == "Music"
+
+    def test_token_auth(self):
+        import hashlib
+
+        from mopidy_ytmusic.subsonic_fe import SubsonicHandler
+
+        h = SubsonicHandler.__new__(SubsonicHandler)
+        h.get_arguments = {}
+        import types
+
+        cfg = {
+            "ytmusic": {
+                "subsonic_username": "kreato",
+                "subsonic_password": "mopidy",
+            }
+        }
+        fe = types.SimpleNamespace(config=cfg)
+        h.fe = fe
+
+        def arg(name, default=""):
+            return h.qs.get(name, default)
+
+        h.get_argument = arg
+        salt = "abc123"
+        h.qs = {
+            "u": "kreato",
+            "t": hashlib.md5(b"mopidyabc123").hexdigest(),
+            "s": salt,
+        }
+        h._check_auth()  # should not raise
+        h.qs = {"u": "kreato", "t": "deadbeef", "s": salt}
+        from mopidy_ytmusic.subsonic_fe import _ApiError
+
+        with self.assertRaises(_ApiError):
+            h._check_auth()
