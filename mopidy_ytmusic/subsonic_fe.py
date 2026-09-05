@@ -345,7 +345,11 @@ class SubsonicHandler(tornado.web.RequestHandler):
     # ------------------------------------------------------------------
 
     def _get_artists(self):
-        refs = self.fe.core.library.browse("ytmusic:artist").get() or []
+        refs = _cached(
+            ("library-artists",),
+            60,
+            lambda: self.fe.core.library.browse("ytmusic:artist").get() or [],
+        )
         resp = _Response()
         artists = resp.child("artists")
         index = None
@@ -454,11 +458,14 @@ class SubsonicHandler(tornado.web.RequestHandler):
             raise _ApiError(70, "Song not found")
         details = data.get("videoDetails") or {}
         resp = _Response()
+        channel_id = details.get("channelId")
         resp.child(
             "song",
             id=self.get_argument("id"),
             title=details.get("title"),
             artist=details.get("author"),
+            artistId=_artist_id(channel_id) if channel_id else None,
+            coverArt=self.get_argument("id"),
             duration=details.get("lengthSeconds") or 0,
         )
         self.write_response(resp)
@@ -544,16 +551,27 @@ class SubsonicHandler(tornado.web.RequestHandler):
             self.finish()
             return
         try:
-            resp = requests.get(url, timeout=15)
+            content_type, content = _cached(
+                ("cover-bytes", url),
+                86400,
+                lambda: self._download_cover(url),
+            )
         except Exception:
             self.set_status(500)
             self.finish()
             return
-        self.set_header(
-            "Content-Type", resp.headers.get("Content-Type", "image/jpeg")
-        )
+        self.set_header("Content-Type", content_type)
         self.set_header("Cache-Control", "public, max-age=86400")
-        self.write(resp.content)
+        self.write(content)
+
+    @staticmethod
+    def _download_cover(url):
+        response = requests.get(url, timeout=15)
+        response.raise_for_status()
+        return (
+            response.headers.get("Content-Type", "image/jpeg"),
+            response.content,
+        )
 
     def _stream(self):
         kind, payload = _split(self.get_argument("id"))
@@ -647,7 +665,11 @@ class SubsonicHandler(tornado.web.RequestHandler):
                     album=track.album.name if track.album else None,
                 )
         else:
-            refs = core.playlists.as_list().get() or []
+            refs = _cached(
+                ("playlists",),
+                60,
+                lambda: core.playlists.as_list().get() or [],
+            )
             resp = _Response()
             playlists = resp.child("playlists")
             for ref in refs:
