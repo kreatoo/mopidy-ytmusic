@@ -72,11 +72,32 @@ _ARRAY_TAGS = {
     "similarSong",
 }
 
+_EMPTY_OBJECT_TAGS = {
+    "musicFolders",
+    "artists",
+    "albumList2",
+    "playlists",
+    "starred",
+    "randomSongs",
+    "searchResult3",
+    "topSongs",
+    "similarSongs",
+    "artistInfo2",
+    "album",
+    "artist",
+    "song",
+    "playlist",
+}
+
 
 def _el_to_value(el):
     """Convert an XML element to Navidrome-style OpenSubsonic JSON."""
     if len(el) == 0:
-        return dict(el.attrib) if el.attrib else (el.text or "")
+        if el.attrib:
+            return dict(el.attrib)
+        if el.tag.split("}")[-1] in _EMPTY_OBJECT_TAGS:
+            return {}
+        return el.text or ""
     value = dict(el.attrib)
     for child in el:
         key = child.tag.split("}")[-1]

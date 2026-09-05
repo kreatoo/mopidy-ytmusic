@@ -184,6 +184,10 @@ class SubsonicTest(unittest.TestCase):
             _to_json(resp3.root)["subsonic-response"]["artist"], dict
         )
 
+        resp4 = _Response()
+        _child(resp4.root, "randomSongs")
+        assert _to_json(resp4.root)["subsonic-response"]["randomSongs"] == {}
+
     def test_token_auth(self):
         import hashlib
 
