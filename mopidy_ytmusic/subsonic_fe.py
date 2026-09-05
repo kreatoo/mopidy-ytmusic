@@ -90,6 +90,38 @@ _ARRAY_TAGS = {
     "similarSong",
 }
 
+_INTEGER_ATTRS = {
+    "duration",
+    "track",
+    "discNumber",
+    "year",
+    "songCount",
+    "albumCount",
+    "artistCount",
+    "size",
+    "bitRate",
+    "bitDepth",
+    "samplingRate",
+    "channelCount",
+    "userRating",
+    "rating",
+    "playCount",
+}
+_BOOLEAN_ATTRS = {"starred", "isVideo", "isDir", "valid"}
+
+
+def _json_attribute(key, value):
+    if key in _INTEGER_ATTRS:
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return value
+    if key in _BOOLEAN_ATTRS:
+        if isinstance(value, str) and value.lower() in {"true", "false"}:
+            return value.lower() == "true"
+    return value
+
+
 _EMPTY_OBJECT_TAGS = {
     "musicFolders",
     "artists",
@@ -112,11 +144,14 @@ def _el_to_value(el):
     """Convert an XML element to Navidrome-style OpenSubsonic JSON."""
     if len(el) == 0:
         if el.attrib:
-            return dict(el.attrib)
+            return {
+                key: _json_attribute(key, value)
+                for key, value in el.attrib.items()
+            }
         if el.tag.split("}")[-1] in _EMPTY_OBJECT_TAGS:
             return {}
         return el.text or ""
-    value = dict(el.attrib)
+    value = {key: _json_attribute(key, item) for key, item in el.attrib.items()}
     for child in el:
         key = child.tag.split("}")[-1]
         cval = _el_to_value(child)

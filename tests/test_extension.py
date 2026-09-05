@@ -184,6 +184,11 @@ class SubsonicTest(unittest.TestCase):
             _to_json(resp3.root)["subsonic-response"]["artist"], dict
         )
 
+        resp_num = _Response()
+        _child(resp_num.root, "song", id="st_x", duration=123, starred=True)
+        song = _to_json(resp_num.root)["subsonic-response"]["song"]
+        assert song["duration"] == 123 and song["starred"] is True
+
         resp4 = _Response()
         _child(resp4.root, "randomSongs")
         assert _to_json(resp4.root)["subsonic-response"]["randomSongs"] == {}
