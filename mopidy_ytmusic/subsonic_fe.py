@@ -118,7 +118,6 @@ class _Response:
             {
                 "status": "ok",
                 "version": API_VERSION,
-                "xmlns": NS,
             },
         )
 
@@ -152,8 +151,9 @@ class SubsonicHandler(tornado.web.RequestHandler):
             self._error(0, "Internal server error")
 
     def _handle(self, method):
-        self._check_auth()
+        # Select the wire format before authentication so auth errors also honor f=json.
         self._json_mode = self.get_argument("f", "xml") == "json"
+        self._check_auth()
 
         if method == "ping":
             self.write_response(_Response().text())
