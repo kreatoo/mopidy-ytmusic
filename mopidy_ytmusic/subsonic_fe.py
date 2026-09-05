@@ -468,13 +468,16 @@ class SubsonicHandler(tornado.web.RequestHandler):
                 owner=self.fe.config["ytmusic"]["subsonic_username"] or None,
             )
             for track in pl.tracks:
+                artist = (
+                    next(iter(track.artists)).name if track.artists else None
+                )
                 _child(
                     node,
                     "entry",
                     id=_song_id(track.uri.split(":")[-1]),
                     parent=playlist_id,
                     title=track.name,
-                    artist=track.artists[0].name if track.artists else None,
+                    artist=artist,
                     album=track.album.name if track.album else None,
                 )
         else:
