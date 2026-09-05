@@ -61,40 +61,34 @@ def _child(container, tag, **attrs):
 
 
 # Elements whose OpenSubsonic JSON is always an array even with one entry.
-_CONTAINER_TAGS = {
-    "musicFolders",
-    "artists",
-    "indexes",
-    "searchResult2",
-    "searchResult3",
-    "albumList",
-    "albumList2",
-    "playlists",
-    "starred",
-    "randomSongs",
-    "similarSongs",
-    "topSongs",
-    "songs",
-    "newest",
-    "recent",
-    "frequent",
-    "highest",
-    "genre",
+_ARRAY_TAGS = {
+    "musicFolder",
+    "index",
+    "artist",
+    "album",
+    "song",
+    "playlist",
+    "entry",
+    "similarSong",
 }
 
 
 def _el_to_value(el):
-    """Convert an XML element to the OpenSubsonic JSON representation."""
-    if len(el) == 0 and not el.attrib:
-        return el.text or ""
+    """Convert an XML element to Navidrome-style OpenSubsonic JSON."""
+    if len(el) == 0:
+        return dict(el.attrib) if el.attrib else (el.text or "")
     value = dict(el.attrib)
     for child in el:
         key = child.tag.split("}")[-1]
         cval = _el_to_value(child)
-        if key in value:
-            if not isinstance(value[key], list):
-                value[key] = [value[key]]
-            value[key].append(cval)
+        if key in _ARRAY_TAGS or key in value:
+            existing = value.get(key)
+            if existing is None:
+                value[key] = [cval]
+            elif isinstance(existing, list):
+                existing.append(cval)
+            else:
+                value[key] = [existing, cval]
         else:
             value[key] = cval
     return value
@@ -102,20 +96,15 @@ def _el_to_value(el):
 
 def _to_json(root):
     response = {"status": root.get("status"), "version": root.get("version")}
-    body = {}
+    children = {}
     for child in root:
         key = child.tag.split("}")[-1]
-        values = [_el_to_value(child)]
-        if key in body:
-            body[key] = (
-                body[key] if isinstance(body[key], list) else [body[key]]
-            )
-            body[key].extend(values)
-        elif child.tag.split("}")[-1] in _CONTAINER_TAGS:
-            body[key] = values
+        cval = _el_to_value(child)
+        if key in _ARRAY_TAGS:
+            children.setdefault(key, []).append(cval)
         else:
-            body[key] = values[0]
-    response.update(body)
+            children[key] = cval
+    response.update(children)
     return {"subsonic-response": response}
 
 
@@ -666,7 +655,7 @@ class SubsonicHandler(tornado.web.RequestHandler):
             for r in (data.get("related") or {}).get("results") or []:
                 _child(
                     node,
-                    "song",
+                    "similarSong",
                     id=_artist_id(r.get("browseId")),
                     title=r.get("title"),
                 )

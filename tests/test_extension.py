@@ -161,11 +161,22 @@ class SubsonicTest(unittest.TestCase):
         resp = _Response()
         folders = resp.child("musicFolders")
         _child(folders, "musicFolder", id="1", name="Music")
-        root = resp.root
-        data = _to_json(root)
+        data = _to_json(resp.root)
+        # Navidrome/Nocturne shape: artists.index[], albumList2.album[] ...
         assert data["subsonic-response"]["status"] == "ok"
-        mf = data["subsonic-response"]["musicFolders"][0]
-        assert mf[0]["id"] == "1" and mf[0]["name"] == "Music"
+        assert (
+            data["subsonic-response"]["musicFolders"]["musicFolder"][0]["name"]
+            == "Music"
+        )
+
+        resp2 = _Response()
+        artists = resp2.child("artists")
+        index = _child(artists, "index", name="A")
+        _child(index, "artist", id="ar_x", name="X")
+        _child(index, "artist", id="ar_y", name="Y")
+        data2 = _to_json(resp2.root)
+        idx = data2["subsonic-response"]["artists"]["index"]
+        assert [a["id"] for a in idx[0]["artist"]] == ["ar_x", "ar_y"]
 
     def test_token_auth(self):
         import hashlib
