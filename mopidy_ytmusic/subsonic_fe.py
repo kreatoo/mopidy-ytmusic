@@ -51,6 +51,15 @@ def _largest(thumbnails):
     return max(thumbnails, key=lambda t: t.get("width") or 0).get("url")
 
 
+def _child(parent, tag, **attrs):
+    """Create a namespaced child element, casting attribute values to str."""
+    el = ET.SubElement(parent, f"{{{NS}}}{tag}")
+    for k, v in attrs.items():
+        if v is not None:
+            el.set(k, str(v))
+    return el
+
+
 class _Response:
     """Very small builder for the subsonic XML envelope."""
 
@@ -66,11 +75,7 @@ class _Response:
         )
 
     def child(self, tag, **attrs):
-        el = ET.SubElement(self.root, f"{{{NS}}}{tag}")
-        for k, v in attrs.items():
-            if v is not None:
-                el.set(k, str(v))
-        return el
+        return _child(self.root, tag, **attrs)
 
     def text(self):
         return ET.tostring(self.root, encoding="unicode")
@@ -255,17 +260,15 @@ class SubsonicHandler(tornado.web.RequestHandler):
             if a.get("browseId") in seen:
                 continue
             seen.add(a.get("browseId"))
-            ET.SubElement(
+            _child(
                 artist,
-                f"{{{NS}}}album",
-                {
-                    "id": _album_id(a["browseId"]),
-                    "name": a.get("title"),
-                    "artist": data.get("name"),
-                    "artistId": _artist_id(payload),
-                    "year": a.get("year"),
-                    "coverArt": _album_id(a["browseId"]),
-                },
+                "album",
+                id=_album_id(a["browseId"]),
+                name=a.get("title"),
+                artist=data.get("name"),
+                artistId=_artist_id(payload),
+                year=a.get("year"),
+                coverArt=_album_id(a["browseId"]),
             )
         self.write_response(resp.text())
 
@@ -449,25 +452,21 @@ class SubsonicHandler(tornado.web.RequestHandler):
                     },
                 )
             elif r.get("resultType") == "album":
-                ET.SubElement(
+                _child(
                     search,
-                    f"{{{NS}}}album",
-                    {
-                        "id": _album_id(r.get("browseId")),
-                        "name": r.get("title"),
-                        "artist": (r.get("artists") or [{}])[0].get("name"),
-                        "year": r.get("year"),
-                        "coverArt": _album_id(r.get("browseId")),
-                    },
+                    "album",
+                    id=_album_id(r.get("browseId")),
+                    name=r.get("title"),
+                    artist=(r.get("artists") or [{}])[0].get("name"),
+                    year=r.get("year"),
+                    coverArt=_album_id(r.get("browseId")),
                 )
             elif r.get("resultType") == "artist":
-                ET.SubElement(
+                _child(
                     search,
-                    f"{{{NS}}}artist",
-                    {
-                        "id": _artist_id(r.get("browseId")),
-                        "name": r.get("artist"),
-                    },
+                    "artist",
+                    id=_artist_id(r.get("browseId")),
+                    name=r.get("artist"),
                 )
         self.write_response(resp.text())
 
