@@ -51,9 +51,9 @@ def _largest(thumbnails):
     return max(thumbnails, key=lambda t: t.get("width") or 0).get("url")
 
 
-def _child(parent, tag, **attrs):
+def _child(container, tag, **attrs):
     """Create a namespaced child element, casting attribute values to str."""
-    el = ET.SubElement(parent, f"{{{NS}}}{tag}")
+    el = ET.SubElement(container, f"{{{NS}}}{tag}")
     for k, v in attrs.items():
         if v is not None:
             el.set(k, str(v))
