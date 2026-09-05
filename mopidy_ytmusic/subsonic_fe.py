@@ -617,47 +617,75 @@ class SubsonicHandler(tornado.web.RequestHandler):
         self.write_response(resp.text())
 
     def _get_top_songs(self):
-        kind, payload = _split(self.get_argument("id"))
+        # Nocturne sends the artist's display name (the Subsonic API uses
+        # ``artist`` here), while some clients send our ar_* id.
+        raw_id = self.get_argument("id", "")
+        kind, payload = _split(raw_id)
+        artist_name = self.get_argument("artist", "")
         resp = _Response()
         node = resp.child("topSongs")
-        if kind == "ar":
-            try:
-                data = self._api().get_artist(payload)
-                for s in (data.get("songs") or {}).get("results") or []:
+        try:
+            if kind == "ar":
+                browse_id = payload
+            elif artist_name:
+                matches = (
+                    self._api().search(artist_name, filter="artists") or []
+                )
+                match = next(
+                    (m for m in matches if m.get("browseId")),
+                    None,
+                )
+                browse_id = match.get("browseId") if match else None
+            else:
+                browse_id = None
+            if browse_id:
+                data = self._api().get_artist(browse_id)
+                for song in (data.get("songs") or {}).get("results") or []:
+                    artists = song.get("artists") or []
                     _child(
                         node,
                         "song",
-                        id=_song_id(s.get("videoId")),
-                        title=s.get("title"),
-                        artist=(
-                            (s.get("artists") or [{}])[0].get("name")
-                            if s.get("artists")
-                            else None
-                        ),
-                        duration=s.get("duration_seconds") or 0,
+                        id=_song_id(song.get("videoId")),
+                        title=song.get("title"),
+                        artist=artists[0].get("name") if artists else None,
+                        duration=song.get("duration_seconds") or 0,
                     )
-            except Exception:
-                logger.debug("Subsonic getTopSongs failed for %s", payload)
+        except Exception:
+            logger.debug(
+                "Subsonic getTopSongs failed for %s", artist_name or raw_id
+            )
         self.write_response(resp)
 
     def _get_similar_songs(self):
-        kind, payload = _split(self.get_argument("id"))
+        kind, payload = _split(self.get_argument("id", ""))
         resp = _Response()
         node = resp.child("similarSongs")
         try:
             if kind == "ar":
                 data = self._api().get_artist(payload)
-            else:
+            elif kind == "st" and payload:
                 details = (
                     self._api().get_song(payload).get("videoDetails") or {}
                 )
-                data = self._api().get_artist(details.get("channelId"))
-            for r in (data.get("related") or {}).get("results") or []:
+                channel_id = details.get("channelId")
+                data = self._api().get_artist(channel_id) if channel_id else {}
+            else:
+                data = {}
+            for song in (data.get("related") or {}).get("results") or []:
                 _child(
                     node,
-                    "similarSong",
-                    id=_artist_id(r.get("browseId")),
-                    title=r.get("title"),
+                    "song",
+                    id=(
+                        _song_id(song.get("videoId"))
+                        if song.get("videoId")
+                        else None
+                    ),
+                    title=song.get("title"),
+                    artist=(
+                        (song.get("artists") or [{}])[0].get("name")
+                        if song.get("artists")
+                        else None
+                    ),
                 )
         except Exception:
             logger.debug("Subsonic getSimilarSongs failed for %s", payload)
